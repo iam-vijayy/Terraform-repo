@@ -11,8 +11,8 @@ provider "aws" {
   region = "ap-south-1"
 }
 
-# Get latest Ubuntu 22.04 AMI
-data "aws_ami" "test_tf" {
+# Get Ubuntu 22.04 AMI
+data "aws_ami" "test-ami" {
   most_recent = true
 
   filter {
@@ -25,7 +25,7 @@ data "aws_ami" "test_tf" {
     values = ["hvm"]
   }
 
-  owners = ["099720109477"] # Canonical
+  owners = ["099720109477"]
 }
 
 # Get the default VPC
@@ -34,15 +34,15 @@ data "aws_vpc" "default" {
 }
 
 # Key Pair (reads your local public key)
-resource "aws_key_pair" "deployer" {
-  key_name   = "deployer-key"
-  public_key = file("~/.ssh/id_rsa.pub")
+resource "aws_key_pair" "test-key" {
+  key_name   = "test-key"
+  public_key = file("/home/vijay/.ssh/id_ed25519.pub")
 }
 
 # Security Group
-resource "aws_security_group" "example_sg" {
-  name        = "example-sg"
-  description = "Allow SSH and HTTP(s) inbound traffic"
+resource "aws_security_group" "test-sg" {
+  name        = "test-sg"
+  description = "Allow SSH, HTTP and HTTPS"
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
@@ -50,7 +50,7 @@ resource "aws_security_group" "example_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # ⚠️ Replace with your IP for security
+    cidr_blocks = ["0.0.0.0/0"] 
   }
 
   ingress {
@@ -78,16 +78,30 @@ resource "aws_security_group" "example_sg" {
   }
 
   tags = {
-    Name = "example-sg"
+    Name = "test-sg"
   }
 }
 
 # EC2 Instance
-resource "aws_instance" "example" {
-  ami                    = data.aws_ami.test_tf.id
+resource "aws_instance" "test" {
+  ami                    = data.aws_ami.test-ami.id
   instance_type          = "t3.micro"
-  key_name               = aws_key_pair.deployer.key_name
-  vpc_security_group_ids = [aws_security_group.example_sg.id]
+  key_name               = aws_key_pair.test-key.key_name
+  vpc_security_group_ids = [aws_security_group.test-sg.id]
+
+# Root volume (default EBS)
+  root_block_device {
+    volume_size = 8     # in GiB
+    volume_type = "gp3"
+  }
+
+# # Extra EBS volume
+#   ebs_block_device {
+#     device_name           = "/dev/sdf"  # device name inside EC2
+#     volume_size           = 20          # size in GiB
+#     volume_type           = "gp3"
+#     delete_on_termination = true
+#   }
 
   tags = {
     Name = "test"
